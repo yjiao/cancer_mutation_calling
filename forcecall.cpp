@@ -12,6 +12,7 @@
 // Added simple loop to make VCF format conform to maflite format needed for oncotator
 // Ex. VCF ref AGC, alt A
 //	   MAF ref  GC, alt -
+// Also update start idx when this adjustment needs to be made
 
 #include <iostream>
 #include <fstream>
@@ -50,6 +51,7 @@ typedef pair<PII,char> PIIC;
 #define FORD(i, n) for (int i = (int)(n) - 1; i >= 0; i--)
 #define FOREACH(i, c) for (typeof((c).begin()) i = (c).begin(); i != (c).end(); i++)
 
+// struct to keep track of which callers found a mutation
 typedef struct {
     uint8_t count;
     bool mutect;
@@ -57,6 +59,7 @@ typedef struct {
     bool vardict;
 } callstats_t;
 
+// struct used to store information relating to mutations
 typedef struct {
     uint8_t chr;  // for now, ignore X, Y, contigs
     uint64_t start;
@@ -65,6 +68,7 @@ typedef struct {
     string alt;
 } mutation_t;
 
+// custom compare function used for keeping mutation_t objects in ordered sets
 struct mutation_compare {
     // custom compare function for mutation_t objects
     bool operator() (const mutation_t &lhs, const mutation_t &rhs) const {
@@ -86,6 +90,7 @@ struct mutation_compare {
     }
 };
 
+// split a string given a char delimiter, returns a vector of strings
 vector<string> split(const string &input, char delim) {
     vector<string> output;
     // split a string "input" based on delimiter, return vector "output"
@@ -98,6 +103,7 @@ vector<string> split(const string &input, char delim) {
     return output;
 }
 
+// split a string given a char delimiter, IN PLACE
 void split(const string &input, char delim, vector<string> &output) {
     // split a string "input" based on delimiter, return vector "output"
     stringstream input_stream;
@@ -108,6 +114,7 @@ void split(const string &input, char delim, vector<string> &output) {
     }
 }
 
+// constructor for mutation_t objects
 mutation_t new_mutation(uint8_t chr, uint64_t start, uint64_t end, string ref, string alt) {
     mutation_t mut;
     mut.chr = chr;
@@ -118,6 +125,7 @@ mutation_t new_mutation(uint8_t chr, uint64_t start, uint64_t end, string ref, s
     return mut;
 }
 
+// write a single line for a force-called mutation to ofstream
 static inline void write_line(ofstream &fh, mutation_t &mut, 
 	pair<uint32_t, uint32_t> &counts) {
 
@@ -136,9 +144,8 @@ static inline void write_line(ofstream &fh, mutation_t &mut,
 
 	if (mut.alt.size() == 0) mut.alt = "-";
 	if (mut.ref.size() == 0) mut.ref = "-";
+	mut.start += idx;
     }
-    size_t idx = 0;
-    
 
     double freq = double(counts.SS) / (double(counts.SS) + double(counts.FF));
     fh << to_string(mut.chr) << '\t';    // chr
@@ -153,6 +160,7 @@ static inline void write_line(ofstream &fh, mutation_t &mut,
     fh << "\n";                          // 
 }
 
+// write a single header line (fields correspond to write_line function)
 static inline void write_header(ofstream &fh) {
     fh << "chr" << '\t';
     fh << "start" << '\t';
@@ -166,6 +174,7 @@ static inline void write_header(ofstream &fh) {
     fh << "\n";
 }
 
+// opens the .bamlist file, populates a vector of strings of paths to bam files, IN PLACE
 static void parse_bamlist(string path, vector<string> &samples) {
     ifstream fh(path);
     string line, filename;
@@ -182,6 +191,7 @@ static void parse_bamlist(string path, vector<string> &samples) {
     fh.close();
 }
 
+// count the number of appearances of (string) pattern in given string
 uint32_t count_substr(const string &str, const string pattern) {
     size_t i = 0;
     uint32_t cnt = 0;
@@ -192,6 +202,7 @@ uint32_t count_substr(const string &str, const string pattern) {
     return cnt;
 }
 
+// get alt count for a mutation and pileup
 void count_alt(mutation_t &mut, vector<string> &pileup, uint8_t nSamps,
 	vector< pair<uint32_t, uint32_t> > &counts) {
     // indel
@@ -226,6 +237,7 @@ void count_alt(mutation_t &mut, vector<string> &pileup, uint8_t nSamps,
     }
 }
 
+// get ref count for a mutation and pileup
 void count_ref(mutation_t &mut, vector<string> &pileup, uint8_t nSamps,
 	vector< pair<uint32_t, uint32_t> > &counts) {
     // indel
@@ -247,6 +259,7 @@ void count_ref(mutation_t &mut, vector<string> &pileup, uint8_t nSamps,
     }
 }
 
+// simple case of getting alt/ref counts for a SNV
 void count_ref_alt_snv(mutation_t &mut, vector<string> &pileup, uint8_t nSamps,
 	 vector< pair<uint32_t, uint32_t> > &counts) {
     // simple SNV
@@ -274,12 +287,14 @@ void count_ref_alt_snv(mutation_t &mut, vector<string> &pileup, uint8_t nSamps,
     }
 }
 
+// divide each element of a vector pair by int b
 static void vec_pair_divide( vector< pair<uint32_t, uint32_t> > &A, int b) {
     FORN(i, A.size()) {
 	A[i].FF /= b;
     }
 }
 
+// add elements of vector B to vector A, IN PLACE, alters A
 static void vec_pair_add( vector< pair<uint32_t, uint32_t> > &A,  vector< pair<uint32_t, uint32_t> > &B) {
     // add B to A
     assert(A.size() == B.size());
@@ -289,6 +304,7 @@ static void vec_pair_add( vector< pair<uint32_t, uint32_t> > &A,  vector< pair<u
     }
 }
 
+// prints fields in mutation_t, for debugging
 static inline void print_mut(mutation_t &mut) {
     printf("chr %d %d %d %s %s\n",
 	    mut.chr,
@@ -298,6 +314,7 @@ static inline void print_mut(mutation_t &mut) {
 	    mut.alt.c_str());
 }
 
+// get a single line in the pileup corresponding to the current position, assumes line exists and pileup is in sorted order
 static void get_pileup(mutation_t &mut, ifstream &fh_pileup, size_t nfiles,
     vector< pair<uint32_t, uint32_t> > &counts) {
 
