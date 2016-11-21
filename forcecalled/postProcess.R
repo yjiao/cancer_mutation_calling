@@ -20,7 +20,7 @@ fh_info <- lapply(files, function(x) {
 	tab$normal_barcode <- normal
 	
 	write.table(tab, paste0("postprocessed/", x, "_postprocessed.maf"),
-	    row.names=F, col.names=T, sep='\t', quote=F)
+	    na="nan", row.names=F, col.names=T, sep='\t', quote=F)
 
 	pair <- paste0(pid, 'T-TP-NB-', tumor, '-', normal)
 	fileloc <- paste0("/seq/hacohenlab1/yjiao/prepost/voting/forcecalled/postprocessed/", x, "_postprocessed.maf")
@@ -32,7 +32,7 @@ fh_info <- lapply(files, function(x) {
 	tab$tumor_barcode <- tab$chr
 	tab$normal_barcode <- tab$chr
 	write.table(tab, paste0("postprocessed/", x, "_postprocessed.maf"),
-	    row.names=F, col.names=T, sep='\t', quote=F)
+	    na="nan", row.names=F, col.names=T, sep='\t', quote=F)
     }
 })
 
