@@ -57,6 +57,11 @@ typedef struct {
     string alt;
 } mutation_t;
 
+void print_mutation(mutation_t mut) {
+    printf("chr%d, %d-%d, %s -> %s\n", mut.chr, mut.start, mut.end,
+	    mut.ref.c_str(), mut.alt.c_str());
+}
+
 struct mutation_compare {
     // custom compare function for mutation_t objects
     bool operator() (const mutation_t &lhs, const mutation_t &rhs) const {
@@ -163,8 +168,9 @@ static void parse_vardict(string &path_vardict, map<mutation_t, callstats_t, mut
 		callstats.vardict = 1;
 		mutations[mut] = callstats;
 	    } else {
+		mutations[mut].count+= (mutations[mut].vardict==0);  // in some cases vcfcombine fails due to different genotype ordering
 		mutations[mut].vardict = 1;
-		mutations[mut].count++;
+		assert(mutations[mut].mutect + mutations[mut].strelka + mutations[mut].vardict == mutations[mut].count);
 	    }
 	}
     }
@@ -204,8 +210,9 @@ static void parse_strelka(string &path_strelka, map<mutation_t, callstats_t, mut
 		callstats.strelka = 1;
 		mutations[mut] = callstats;
 	    } else {
+		mutations[mut].count += (mutations[mut].strelka==0);  // in some cases vcfcombine fails due to different genotype ordering
 		mutations[mut].strelka = 1;
-		mutations[mut].count++;
+		assert(mutations[mut].mutect + mutations[mut].strelka + mutations[mut].vardict == mutations[mut].count);
 	    }
 	}
     }
@@ -241,8 +248,9 @@ static void parse_mutect(string &path_mutect, map<mutation_t, callstats_t, mutat
 		callstats.mutect = 1;
 		mutations[mut] = callstats;
 	    } else {
+		mutations[mut].count+= (mutations[mut].vardict==0);  // in some cases vcfcombine fails due to different genotype ordering
 		mutations[mut].mutect = 1;
-		mutations[mut].count++;
+		assert(mutations[mut].mutect + mutations[mut].strelka + mutations[mut].vardict == mutations[mut].count);
 	    }
 	}
     }

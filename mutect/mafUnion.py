@@ -1,6 +1,7 @@
 from glob import glob
 from collections import defaultdict
 from os import system
+from sys import argv
 
 # format of MAF files:
 #  build chr     start       end ref_allele tum_allele1 tum_allele2       tumor_barcode       normal_barcode  tumor_f init_t_lod t_lod_fstar t_alt_count t_ref_count judgement
@@ -47,11 +48,14 @@ def merge(samps):
     return union
 
 sampleGroups = defaultdict(list)
-
-mafFiles = glob('*.maf')
+path = argv[1]
+print "input path:", path
+mafFiles = glob(path + '/*.maf')
 for file in mafFiles:
+    file = file.replace(path,'')
+    file = file.replace('/','')
     pat = file.split('-')[0]
-    sampleGroups[pat].append(file)
+    sampleGroups[pat].append(path + '/' + file)
 
 for pat, samps in sampleGroups.iteritems():
     print pat, "----------------------------"
@@ -59,8 +63,9 @@ for pat, samps in sampleGroups.iteritems():
     union = list(union)
     union.sort(key=lambda x: (x[0], x[1], x[2]))
     union = map(list, union)
-    file = 'union/' + pat + '_mutect_combined.maf'
+    file = path + '/union/' + pat + '_mutect_combined.maf'
     with open(file, 'w') as f:
+	print "writing to", file
 	for u in union:
 	    line = ' '.join(map(str, u)) + '\n'
 	    f.write(line)
